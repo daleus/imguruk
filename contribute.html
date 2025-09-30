@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contribute - ImgurUK</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        nav { background: #1a1a1a; padding: 1rem 2rem; border-bottom: 1px solid #333; }
+        nav .container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        nav h1 { font-size: 1.5rem; }
+        nav h1 a { color: #fff; text-decoration: none; }
+        nav .links a { color: #fff; text-decoration: none; margin-left: 1.5rem; padding: 0.5rem 1rem; border-radius: 4px; transition: background 0.2s; }
+        nav .links a:hover { background: #333; }
+        .container { max-width: 1000px; margin: 2rem auto; padding: 2rem; }
+        .section { background: #1a1a1a; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid #333; }
+        h2 { margin-bottom: 1rem; color: #4CAF50; }
+        .info { color: #aaa; margin-bottom: 1.5rem; line-height: 1.6; }
+        .token-box { background: #0a0a0a; padding: 1rem; border-radius: 4px; display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+        .token-box input { flex: 1; background: transparent; border: 1px solid #333; color: #fff; padding: 0.5rem; border-radius: 4px; font-family: monospace; }
+        .btn { background: #4CAF50; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        .btn:hover { background: #45a049; }
+        .btn.secondary { background: #333; }
+        .btn.secondary:hover { background: #444; }
+        .btn.danger { background: #f44336; }
+        .btn.danger:hover { background: #da190b; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #aaa; }
+        input[type="url"] { width: 100%; padding: 0.75rem; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; color: #fff; }
+        .message { padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; display: none; }
+        .message.error { background: #f44336; }
+        .message.success { background: #4CAF50; }
+        .proxy-list { margin-top: 1rem; }
+        .proxy-item { background: #0a0a0a; padding: 1rem; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .proxy-url { flex: 1; font-family: monospace; }
+        .proxy-status { padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.9rem; margin: 0 1rem; }
+        .proxy-status.active { background: #4CAF50; }
+        .proxy-status.inactive { background: #666; }
+        .proxy-actions { display: flex; gap: 0.5rem; }
+        .btn-small { padding: 0.5rem 1rem; font-size: 0.9rem; }
+        code { background: #0a0a0a; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace; color: #4CAF50; }
+        .empty-state { text-align: center; color: #666; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <h1><a href="/">ImgurUK</a></h1>
+            <div class="links">
+                <a href="/">Home</a>
+                <a href="/upload.html">Upload</a>
+                <a href="/api.php?action=logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Contribute to the Network</h1>
+
+        <div class="section">
+            <h2>How It Works</h2>
+            <div class="info">
+                Help distribute the load by hosting a proxy script on your server. When users request imgur content through ImgurUK,
+                we'll randomly distribute requests to contributor proxies. Your proxy fetches the content from imgur and returns it to our network.
+                <br><br>
+                <strong>Benefits:</strong>
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li>Distribute bandwidth across multiple servers</li>
+                    <li>Help keep the service fast and reliable</li>
+                    <li>Support the community</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Your API Token</h2>
+            <div class="info">
+                This token authenticates your proxy script. Keep it secret!
+            </div>
+            <div class="token-box">
+                <input type="text" id="apiToken" readonly value="Loading...">
+                <button class="btn secondary" onclick="copyToken()">Copy</button>
+                <button class="btn secondary" onclick="regenerateToken()">Regenerate</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Download Proxy Script</h2>
+            <div class="info">
+                Download this PHP script and upload it to any web-accessible path on your server.
+                The script validates requests from ImgurUK and proxies content from imgur.com.
+                <br><br>
+                Examples of valid setups:
+                <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                    <li><code>https://yoursite.com/imguruk-proxy.php</code></li>
+                    <li><code>https://cdn.yoursite.com/proxy/index.php</code></li>
+                    <li><code>https://yoursite.com/images/</code> (as index.php)</li>
+                </ul>
+            </div>
+            <button class="btn" onclick="downloadScript()">Download imguruk-proxy.php</button>
+        </div>
+
+        <div class="section">
+            <h2>Register Your Proxy</h2>
+            <div id="proxyMessage" class="message"></div>
+            <form id="addProxyForm">
+                <div class="form-group">
+                    <label for="proxyUrl">Proxy URL</label>
+                    <input type="url" id="proxyUrl" name="proxyUrl" placeholder="https://yoursite.com/imguruk-proxy.php" required>
+                    <small style="color: #666;">The full URL (including filename) where your proxy script is accessible. Requests will be made to this URL with the filename appended (e.g., your-url/image.jpg)</small>
+                </div>
+                <button type="submit" class="btn">Add Proxy</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Your Proxies</h2>
+            <div id="proxyList" class="proxy-list">
+                <div class="empty-state">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let apiToken = '';
+
+        async function loadApiToken() {
+            try {
+                const response = await fetch('/api.php?action=get_api_token');
+                const result = await response.json();
+                if (result.success) {
+                    apiToken = result.token;
+                    document.getElementById('apiToken').value = apiToken;
+                }
+            } catch (error) {
+                document.getElementById('apiToken').value = 'Error loading token';
+            }
+        }
+
+        async function loadProxies() {
+            try {
+                const response = await fetch('/api.php?action=get_proxies');
+                const result = await response.json();
+                const proxyList = document.getElementById('proxyList');
+
+                if (result.success && result.proxies.length > 0) {
+                    proxyList.innerHTML = result.proxies.map(proxy => `
+                        <div class="proxy-item">
+                            <div class="proxy-url">${proxy.proxy_url}</div>
+                            <span class="proxy-status ${proxy.is_active ? 'active' : 'inactive'}">
+                                ${proxy.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                            <div class="proxy-actions">
+                                <button class="btn btn-small secondary" onclick="toggleProxy(${proxy.id})">
+                                    ${proxy.is_active ? 'Disable' : 'Enable'}
+                                </button>
+                                <button class="btn btn-small danger" onclick="deleteProxy(${proxy.id})">Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    proxyList.innerHTML = '<div class="empty-state">No proxies registered yet</div>';
+                }
+            } catch (error) {
+                document.getElementById('proxyList').innerHTML = '<div class="empty-state">Error loading proxies</div>';
+            }
+        }
+
+        function copyToken() {
+            const input = document.getElementById('apiToken');
+            input.select();
+            document.execCommand('copy');
+            alert('Token copied to clipboard!');
+        }
+
+        async function regenerateToken() {
+            if (!confirm('Are you sure? This will invalidate your current token and all proxies will need the new script.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api.php?action=regenerate_token', { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    apiToken = result.token;
+                    document.getElementById('apiToken').value = apiToken;
+                    alert('Token regenerated! Download the new script and update your proxies.');
+                }
+            } catch (error) {
+                alert('Failed to regenerate token');
+            }
+        }
+
+        async function downloadScript() {
+            if (!apiToken) {
+                alert('Please wait for token to load');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api.php?action=download_script');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'imguruk-proxy.php';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                alert('Failed to download script');
+            }
+        }
+
+        document.getElementById('addProxyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const proxyUrl = formData.get('proxyUrl');
+
+            try {
+                const response = await fetch('/api.php?action=add_proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proxy_url: proxyUrl })
+                });
+
+                const result = await response.json();
+                const messageDiv = document.getElementById('proxyMessage');
+
+                if (result.success) {
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = result.message;
+                    messageDiv.style.display = 'block';
+                    e.target.reset();
+                    loadProxies();
+                    setTimeout(() => messageDiv.style.display = 'none', 3000);
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = result.error;
+                    messageDiv.style.display = 'block';
+                }
+            } catch (error) {
+                const messageDiv = document.getElementById('proxyMessage');
+                messageDiv.className = 'message error';
+                messageDiv.textContent = 'An error occurred';
+                messageDiv.style.display = 'block';
+            }
+        });
+
+        async function toggleProxy(id) {
+            try {
+                const response = await fetch('/api.php?action=toggle_proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proxy_id: id })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadProxies();
+                }
+            } catch (error) {
+                alert('Failed to toggle proxy');
+            }
+        }
+
+        async function deleteProxy(id) {
+            if (!confirm('Are you sure you want to delete this proxy?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api.php?action=delete_proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proxy_id: id })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadProxies();
+                }
+            } catch (error) {
+                alert('Failed to delete proxy');
+            }
+        }
+
+        // Load data on page load
+        loadApiToken();
+        loadProxies();
+    </script>
+</body>
+</html>

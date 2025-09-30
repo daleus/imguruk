@@ -25,14 +25,16 @@ function register($username, $email, $password, $honeypot = []) {
         return ['success' => false, 'error' => 'Password must be at least 8 characters'];
     }
 
-    // Hash password
+    // Hash password and generate API token
     $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+    $apiToken = generateApiToken();
 
     // Insert user
-    $stmt = $db->prepare('INSERT INTO users (username, email, password_hash) VALUES (:username, :email, :password_hash)');
+    $stmt = $db->prepare('INSERT INTO users (username, email, password_hash, api_token) VALUES (:username, :email, :password_hash, :api_token)');
     $stmt->bindValue(':username', $username, SQLITE3_TEXT);
     $stmt->bindValue(':email', $email, SQLITE3_TEXT);
     $stmt->bindValue(':password_hash', $passwordHash, SQLITE3_TEXT);
+    $stmt->bindValue(':api_token', $apiToken, SQLITE3_TEXT);
 
     try {
         $stmt->execute();

@@ -1,4 +1,6 @@
 <?php
+require_once 'db.php';
+
 // Get the host and check subdomain
 $host = $_SERVER['HTTP_HOST'];
 $subdomain = explode('.', $host)[0];
@@ -30,19 +32,67 @@ if ($subdomain === 'i') {
             }
         }
 
-        // Otherwise, proxy from imgur
-        $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-        $fullUrl = $protocol . '://' . $host . $uri;
-        $fullUrl = str_replace('imguruk.', 'imgur.', $fullUrl);
-        $fullUrl = preg_replace('/^http:/', 'https:', $fullUrl);
+        // Otherwise, try to use a contributor proxy, fallback to direct imgur
+        $proxy = getRandomProxy();
 
-        // Initialize cURL
-        $ch = curl_init($fullUrl);
+        if ($proxy) {
+            // Use contributor proxy
+            $proxyUrl = rtrim($proxy['proxy_url'], '/') . $uri;
+            $apiToken = '';
+
+            // Get the user's API token for this proxy
+            $db = getDB();
+            $stmt = $db->prepare('SELECT u.api_token FROM users u INNER JOIN user_proxies p ON u.id = p.user_id WHERE p.id = :proxy_id');
+            $stmt->bindValue(':proxy_id', $proxy['id'], SQLITE3_INTEGER);
+            $result = $stmt->execute();
+            $proxyUser = $result->fetchArray(SQLITE3_ASSOC);
+
+            if ($proxyUser && !empty($proxyUser['api_token'])) {
+                $apiToken = $proxyUser['api_token'];
+            }
+
+            // Request from contributor proxy
+            $ch = curl_init($proxyUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'X-API-Token: ' . $apiToken
+            ]);
+            curl_setopt($ch, CURLOPT_REFERER, 'https://imguruk.com');
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+
+            if ($httpCode === 200 && $response) {
+                $headers = substr($response, 0, $headerSize);
+                $body = substr($response, $headerSize);
+                curl_close($ch);
+
+                // Parse and send Content-Type header
+                if (preg_match('/Content-Type:\s*([^\r\n]+)/i', $headers, $matches)) {
+                    header('Content-Type: ' . trim($matches[1]));
+                }
+
+                echo $body;
+                exit;
+            }
+
+            curl_close($ch);
+            // If proxy failed, fall through to direct fetch
+        }
+
+        // Fallback: fetch directly from imgur
+        $imgurUrl = 'https://i.imgur.com' . $uri;
+
+        $ch = curl_init($imgurUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
 
-        // Execute the request
         $response = curl_exec($ch);
         $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $headers = substr($response, 0, $headerSize);
@@ -86,6 +136,7 @@ if ($subdomain === 'i') {
             .hero { text-align: center; padding: 4rem 2rem; }
             .hero h2 { font-size: 3rem; margin-bottom: 1rem; }
             .hero p { font-size: 1.2rem; color: #aaa; margin-bottom: 2rem; }
+            .hero img { max-width: 600px; width: 100%; border-radius: 8px; margin: 2rem auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
             .cta { display: inline-block; background: #4CAF50; color: #fff; padding: 1rem 2rem; border-radius: 4px; text-decoration: none; font-weight: bold; transition: background 0.2s; }
             .cta:hover { background: #45a049; }
         </style>
@@ -98,6 +149,7 @@ if ($subdomain === 'i') {
                     <?php if ($isLoggedIn): ?>
                         <span>Welcome, <?php echo htmlspecialchars($username); ?></span>
                         <a href="/upload.html">Upload</a>
+                        <a href="/contribute.html">Contribute</a>
                         <a href="/api.php?action=logout">Logout</a>
                     <?php else: ?>
                         <a href="/login.html">Login</a>
@@ -110,6 +162,7 @@ if ($subdomain === 'i') {
         <div class="hero">
             <h2>Simple Image Hosting</h2>
             <p>Upload and share your images instantly</p>
+            <img src="https://i.imguruk.com/uk-4.png" alt="Example hosted image">
             <?php if ($isLoggedIn): ?>
                 <a href="/upload.html" class="cta">Upload Image</a>
             <?php else: ?>

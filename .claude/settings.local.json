@@ -6,7 +6,10 @@
       "Bash(sudo apt-get install:*)",
       "Bash(sudo chown:*)",
       "Bash(sudo chmod:*)",
-      "Bash(sudo systemctl reload:*)"
+      "Bash(sudo systemctl reload:*)",
+      "Bash(sqlite3:*)",
+      "Bash(php:*)",
+      "Bash(php8.3:*)"
     ],
     "deny": [],
     "ask": []

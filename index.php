@@ -1,6 +1,24 @@
 <?php
 require_once 'db.php';
 
+// Proxy request logging function
+function logProxyRequest($filename, $proxyId, $proxyUrl, $httpCode, $fellbackToDirect = false) {
+    $logFile = '/www/imguruk.com/log/proxy_requests.log';
+    $timestamp = date('Y-m-d H:i:s');
+    $status = $fellbackToDirect ? 'FALLBACK' : ($httpCode === 200 ? 'SUCCESS' : 'FAILED');
+
+    $logEntry = json_encode([
+        'timestamp' => $timestamp,
+        'filename' => $filename,
+        'proxy_id' => $proxyId,
+        'proxy_url' => $proxyUrl,
+        'http_code' => $httpCode,
+        'status' => $status
+    ]) . "\n";
+
+    file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+}
+
 // Get the host and check subdomain
 $host = $_SERVER['HTTP_HOST'];
 $subdomain = explode('.', $host)[0];
@@ -13,6 +31,12 @@ if ($subdomain === 'i') {
     $pathInfo = pathinfo($uri);
     if (!empty($pathInfo['extension']) && !empty($pathInfo['filename'])) {
         $filename = basename($uri);
+
+        // Ignore favicon requests
+        if ($filename === 'favicon.ico') {
+            http_response_code(404);
+            exit;
+        }
 
         // Check if this is a local uk- file
         if (strpos($filename, 'uk-') === 0) {
@@ -71,6 +95,9 @@ if ($subdomain === 'i') {
                 $body = substr($response, $headerSize);
                 curl_close($ch);
 
+                // Log successful proxy request
+                logProxyRequest($filename, $proxy['id'], $proxy['proxy_url'], $httpCode);
+
                 // Parse and send Content-Type header
                 if (preg_match('/Content-Type:\s*([^\r\n]+)/i', $headers, $matches)) {
                     header('Content-Type: ' . trim($matches[1]));
@@ -79,6 +106,9 @@ if ($subdomain === 'i') {
                 echo $body;
                 exit;
             }
+
+            // Log failed proxy request
+            logProxyRequest($filename, $proxy['id'], $proxy['proxy_url'], $httpCode);
 
             curl_close($ch);
             // If proxy failed, fall through to direct fetch
@@ -94,10 +124,16 @@ if ($subdomain === 'i') {
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
 
         $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $headers = substr($response, 0, $headerSize);
         $body = substr($response, $headerSize);
         curl_close($ch);
+
+        // Log fallback to direct fetch
+        if ($proxy) {
+            logProxyRequest($filename, null, 'DIRECT_IMGUR', $httpCode, true);
+        }
 
         // Parse and send Content-Type header
         if (preg_match('/Content-Type:\s*([^\r\n]+)/i', $headers, $matches)) {
@@ -141,6 +177,9 @@ if ($subdomain === 'i') {
             .hero img { max-width: 600px; width: 100%; border-radius: 8px; margin: 2rem auto; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
             .cta { display: inline-block; background: #4CAF50; color: #fff; padding: 1rem 2rem; border-radius: 4px; text-decoration: none; font-weight: bold; transition: background 0.2s; }
             .cta:hover { background: #45a049; }
+            .github-link { display: inline-flex; align-items: center; gap: 0.5rem; color: #fff; text-decoration: none; margin-bottom: 2rem; padding: 0.75rem 1.5rem; background: #333; border-radius: 4px; transition: background 0.2s; }
+            .github-link:hover { background: #444; }
+            .github-link svg { width: 20px; height: 20px; fill: currentColor; }
         </style>
     </head>
     <body>
@@ -167,6 +206,12 @@ if ($subdomain === 'i') {
         <div class="hero">
             <h2>Simple Image Hosting</h2>
             <p>Upload and share your images instantly</p>
+            <a href="https://github.com/daleus/imguruk" target="_blank" rel="noopener noreferrer" class="github-link">
+                <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                View on GitHub
+            </a>
             <img src="https://i.imguruk.com/uk-4.png" alt="Example hosted image">
             <?php if ($isLoggedIn): ?>
                 <a href="/upload.html" class="cta">Upload Image</a>

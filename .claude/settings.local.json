@@ -9,7 +9,8 @@
       "Bash(sudo systemctl reload:*)",
       "Bash(sqlite3:*)",
       "Bash(php:*)",
-      "Bash(php8.3:*)"
+      "Bash(php8.3:*)",
+      "Read(//www/imguruk.com/**)"
     ],
     "deny": [],
     "ask": []

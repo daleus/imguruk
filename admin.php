@@ -386,3 +386,40 @@ function checkAllProxiesHealth($adminUserId) {
 
     return ['success' => true, 'results' => $results];
 }
+
+// Get proxy request logs
+function getProxyLogs($limit = 100, $proxyId = null) {
+    $logFile = '/www/imguruk.com/log/proxy_requests.log';
+
+    if (!file_exists($logFile)) {
+        return ['success' => true, 'logs' => []];
+    }
+
+    $lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return ['success' => false, 'error' => 'Failed to read log file'];
+    }
+
+    // Reverse to get newest first
+    $lines = array_reverse($lines);
+
+    $logs = [];
+    foreach ($lines as $line) {
+        $entry = json_decode($line, true);
+        if ($entry) {
+            // Filter by proxy_id if specified
+            if ($proxyId !== null && $entry['proxy_id'] != $proxyId) {
+                continue;
+            }
+
+            $logs[] = $entry;
+
+            // Stop if we've hit the limit
+            if (count($logs) >= $limit) {
+                break;
+            }
+        }
+    }
+
+    return ['success' => true, 'logs' => $logs];
+}

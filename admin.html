@@ -104,6 +104,21 @@
                 <button class="btn" onclick="checkAllProxiesHealth()">🩺 Check All Health</button>
                 <div id="proxiesTable" style="margin-top: 1rem;">Loading...</div>
             </div>
+
+            <div class="section">
+                <h2>Proxy Request Logs</h2>
+                <div style="margin-bottom: 1rem;">
+                    <label style="color: #aaa; margin-right: 0.5rem;">Show:</label>
+                    <select id="logLimit" onchange="loadProxyLogs()" style="padding: 0.5rem; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; color: #fff; margin-right: 1rem;">
+                        <option value="50">Last 50</option>
+                        <option value="100" selected>Last 100</option>
+                        <option value="250">Last 250</option>
+                        <option value="500">Last 500</option>
+                    </select>
+                    <button class="btn btn-small" onclick="loadProxyLogs()">🔄 Refresh</button>
+                </div>
+                <div id="proxyLogsTable" style="margin-top: 1rem;">Loading...</div>
+            </div>
         </div>
 
         <div id="todos" class="tab-content">
@@ -511,6 +526,63 @@
             }
         }
 
+        async function loadProxyLogs() {
+            try {
+                const limit = document.getElementById('logLimit').value;
+                const response = await fetch(`/api.php?action=admin_get_proxy_logs&limit=${limit}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const container = document.getElementById('proxyLogsTable');
+
+                    if (result.logs.length === 0) {
+                        container.innerHTML = '<div class="empty-state">No proxy requests logged yet</div>';
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Filename</th>
+                                    <th>Proxy ID</th>
+                                    <th>Proxy URL</th>
+                                    <th>HTTP Code</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${result.logs.map(log => {
+                                    let statusBadge = '';
+                                    if (log.status === 'SUCCESS') {
+                                        statusBadge = '<span class="badge" style="background: #4CAF50;">✓ Success</span>';
+                                    } else if (log.status === 'FALLBACK') {
+                                        statusBadge = '<span class="badge" style="background: #ff9800;">⚠ Fallback</span>';
+                                    } else {
+                                        statusBadge = '<span class="badge" style="background: #f44336;">✗ Failed</span>';
+                                    }
+
+                                    return `
+                                    <tr>
+                                        <td>${log.timestamp}</td>
+                                        <td><code>${log.filename}</code></td>
+                                        <td>${log.proxy_id || '-'}</td>
+                                        <td><code style="font-size: 0.85rem;">${log.proxy_url}</code></td>
+                                        <td>${log.http_code}</td>
+                                        <td>${statusBadge}</td>
+                                    </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading proxy logs:', error);
+            }
+        }
+
         // Todo functions
         async function loadTodos() {
             try {
@@ -694,6 +766,7 @@
         loadUsers();
         loadImages();
         loadProxies();
+        loadProxyLogs();
         loadTodos();
     </script>
 </body>

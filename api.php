@@ -439,6 +439,19 @@ switch ($action) {
         echo json_encode($result);
         break;
 
+    case 'admin_get_proxy_logs':
+        if (!isLoggedIn() || !isAdmin(getCurrentUserId())) {
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 100;
+        $proxyId = isset($_GET['proxy_id']) ? (int)$_GET['proxy_id'] : null;
+
+        $result = getProxyLogs($limit, $proxyId);
+        echo json_encode($result);
+        break;
+
     default:
         echo json_encode(['success' => false, 'error' => 'Invalid action']);
         break;

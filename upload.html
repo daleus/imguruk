@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload - ImgurUK</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        nav { background: #1a1a1a; padding: 1rem 2rem; border-bottom: 1px solid #333; }
+        nav .container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        nav h1 { font-size: 1.5rem; }
+        nav h1 a { color: #fff; text-decoration: none; }
+        nav .links a { color: #fff; text-decoration: none; margin-left: 1.5rem; padding: 0.5rem 1rem; border-radius: 4px; transition: background 0.2s; }
+        nav .links a:hover { background: #333; }
+        .container { max-width: 800px; margin: 2rem auto; padding: 2rem; }
+        .upload-area { background: #1a1a1a; border: 2px dashed #333; border-radius: 8px; padding: 3rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+        .upload-area:hover { border-color: #4CAF50; }
+        .upload-area.dragover { border-color: #4CAF50; background: #0f0f0f; }
+        .upload-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .upload-text { color: #aaa; margin-bottom: 1rem; }
+        input[type="file"] { display: none; }
+        .btn { display: inline-block; background: #4CAF50; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: bold; cursor: pointer; border: none; }
+        .btn:hover { background: #45a049; }
+        .message { padding: 0.75rem; margin-bottom: 1rem; border-radius: 4px; display: none; }
+        .message.error { background: #f44336; }
+        .message.success { background: #4CAF50; }
+        .preview { margin-top: 2rem; display: none; }
+        .preview img { max-width: 100%; border-radius: 8px; margin-bottom: 1rem; }
+        .url-box { background: #1a1a1a; padding: 1rem; border-radius: 4px; display: flex; gap: 1rem; align-items: center; }
+        .url-box input { flex: 1; background: #0a0a0a; border: 1px solid #333; color: #fff; padding: 0.5rem; border-radius: 4px; }
+        .copy-btn { background: #333; color: #fff; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
+        .copy-btn:hover { background: #444; }
+        .loading { display: none; margin-top: 1rem; color: #aaa; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <h1><a href="/">ImgurUK</a></h1>
+            <div class="links">
+                <a href="/">Home</a>
+                <a href="/api.php?action=logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Upload Image</h2>
+        <div id="message" class="message"></div>
+
+        <div id="uploadArea" class="upload-area">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">Click to select or drag and drop an image</div>
+            <div class="upload-text" style="font-size: 0.9rem;">Max 10MB • JPG, PNG, GIF, WEBP</div>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div id="loading" class="loading">Uploading...</div>
+
+        <div id="preview" class="preview">
+            <h3>Upload Successful!</h3>
+            <img id="previewImage" src="" alt="Uploaded image">
+            <div class="url-box">
+                <input type="text" id="imageUrl" readonly>
+                <button class="copy-btn" onclick="copyUrl()">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const messageDiv = document.getElementById('message');
+        const loading = document.getElementById('loading');
+        const preview = document.getElementById('preview');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) handleUpload(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleUpload(e.target.files[0]);
+        });
+
+        async function handleUpload(file) {
+            if (!file.type.startsWith('image/')) {
+                showMessage('Please select an image file', 'error');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showMessage('File too large (max 10MB)', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            loading.style.display = 'block';
+            preview.style.display = 'none';
+            messageDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api.php?action=upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                loading.style.display = 'none';
+
+                if (result.success) {
+                    document.getElementById('previewImage').src = result.url;
+                    document.getElementById('imageUrl').value = result.url;
+                    preview.style.display = 'block';
+                } else {
+                    showMessage(result.error, 'error');
+                }
+            } catch (error) {
+                loading.style.display = 'none';
+                showMessage('Upload failed', 'error');
+            }
+        }
+
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+        }
+
+        function copyUrl() {
+            const input = document.getElementById('imageUrl');
+            input.select();
+            document.execCommand('copy');
+            alert('URL copied to clipboard!');
+        }
+    </script>
+</body>
+</html>

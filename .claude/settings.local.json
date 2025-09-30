@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//etc/nginx/sites-enabled/**)",
+      "Read(//www/imguruk.com/log/**)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(sudo chown:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(sudo systemctl reload:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

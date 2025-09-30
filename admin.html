@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - ImgurUK</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
+        nav { background: #1a1a1a; padding: 1rem 2rem; border-bottom: 1px solid #333; }
+        nav .container { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        nav h1 { font-size: 1.5rem; }
+        nav h1 a { color: #fff; text-decoration: none; }
+        nav .links a { color: #fff; text-decoration: none; margin-left: 1.5rem; padding: 0.5rem 1rem; border-radius: 4px; transition: background 0.2s; }
+        nav .links a:hover { background: #333; }
+        .container { max-width: 1400px; margin: 2rem auto; padding: 2rem; }
+        .tabs { display: flex; gap: 1rem; margin-bottom: 2rem; border-bottom: 2px solid #333; }
+        .tab { padding: 1rem 2rem; cursor: pointer; background: transparent; border: none; color: #aaa; font-size: 1rem; font-weight: bold; transition: all 0.2s; }
+        .tab:hover { color: #fff; }
+        .tab.active { color: #4CAF50; border-bottom: 2px solid #4CAF50; margin-bottom: -2px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .section { background: #1a1a1a; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid #333; }
+        h2 { margin-bottom: 1.5rem; color: #4CAF50; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 1rem; background: #0a0a0a; border-bottom: 2px solid #333; }
+        td { padding: 1rem; border-bottom: 1px solid #222; }
+        tr:hover { background: #0f0f0f; }
+        .btn { background: #4CAF50; color: #fff; padding: 0.5rem 1rem; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; margin-right: 0.5rem; }
+        .btn:hover { background: #45a049; }
+        .btn.danger { background: #f44336; }
+        .btn.danger:hover { background: #da190b; }
+        .btn.secondary { background: #666; }
+        .btn.secondary:hover { background: #555; }
+        .btn-small { padding: 0.4rem 0.8rem; font-size: 0.9rem; }
+        .badge { padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.85rem; font-weight: bold; }
+        .badge.admin { background: #ff9800; color: #000; }
+        .badge.active { background: #4CAF50; }
+        .badge.inactive { background: #666; }
+        .image-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
+        .empty-state { text-align: center; padding: 3rem; color: #666; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: #1a1a1a; padding: 1.5rem; border-radius: 8px; border: 1px solid #333; }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #4CAF50; }
+        .stat-label { color: #aaa; margin-top: 0.5rem; }
+        code { background: #0a0a0a; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <h1><a href="/">ImgurUK</a></h1>
+            <div class="links">
+                <a href="/">Home</a>
+                <a href="/upload.html">Upload</a>
+                <a href="/contribute.html">Contribute</a>
+                <a href="/api.php?action=logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Admin Panel</h1>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">-</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalImages">-</div>
+                <div class="stat-label">Total Images</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalProxies">-</div>
+                <div class="stat-label">Total Proxies</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('users')">Users</button>
+            <button class="tab" onclick="switchTab('images')">Images</button>
+            <button class="tab" onclick="switchTab('proxies')">Proxies</button>
+        </div>
+
+        <div id="users" class="tab-content active">
+            <div class="section">
+                <h2>Users</h2>
+                <div id="usersTable">Loading...</div>
+            </div>
+        </div>
+
+        <div id="images" class="tab-content">
+            <div class="section">
+                <h2>Uploaded Images</h2>
+                <div id="imagesTable">Loading...</div>
+            </div>
+        </div>
+
+        <div id="proxies" class="tab-content">
+            <div class="section">
+                <h2>Registered Proxies</h2>
+                <div id="proxiesTable">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tab).classList.add('active');
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api.php?action=admin_get_users');
+                const result = await response.json();
+
+                if (result.success) {
+                    const container = document.getElementById('usersTable');
+                    document.getElementById('totalUsers').textContent = result.users.length;
+
+                    if (result.users.length === 0) {
+                        container.innerHTML = '<div class="empty-state">No users found</div>';
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${result.users.map(user => `
+                                    <tr>
+                                        <td>${user.id}</td>
+                                        <td>
+                                            ${user.username}
+                                            ${user.is_admin ? '<span class="badge admin">ADMIN</span>' : ''}
+                                        </td>
+                                        <td>${user.email}</td>
+                                        <td>
+                                            <span class="badge ${user.is_active ? 'active' : 'inactive'}">
+                                                ${user.is_active ? 'Active' : 'Disabled'}
+                                            </span>
+                                        </td>
+                                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                                        <td>
+                                            <button class="btn btn-small secondary" onclick="changePassword(${user.id})">Change Password</button>
+                                            <button class="btn btn-small secondary" onclick="toggleActive(${user.id})">
+                                                ${user.is_active ? 'Disable' : 'Enable'}
+                                            </button>
+                                            <button class="btn btn-small secondary" onclick="toggleAdmin(${user.id})">
+                                                ${user.is_admin ? 'Demote' : 'Promote'}
+                                            </button>
+                                            <button class="btn btn-small danger" onclick="deleteUser(${user.id}, '${user.username}')">Delete</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        async function loadImages() {
+            try {
+                const response = await fetch('/api.php?action=admin_get_images');
+                const result = await response.json();
+
+                if (result.success) {
+                    const container = document.getElementById('imagesTable');
+                    document.getElementById('totalImages').textContent = result.images.length;
+
+                    if (result.images.length === 0) {
+                        container.innerHTML = '<div class="empty-state">No images found</div>';
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Preview</th>
+                                    <th>Filename</th>
+                                    <th>Original Name</th>
+                                    <th>Uploader</th>
+                                    <th>Size</th>
+                                    <th>Uploaded</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${result.images.map(img => `
+                                    <tr>
+                                        <td><img src="https://i.imguruk.com/${img.filename}" class="image-preview" alt="${img.filename}"></td>
+                                        <td><code>${img.filename}</code></td>
+                                        <td>${img.original_filename}</td>
+                                        <td>${img.username || 'Unknown'}</td>
+                                        <td>${(img.file_size / 1024).toFixed(2)} KB</td>
+                                        <td>${new Date(img.uploaded_at).toLocaleDateString()}</td>
+                                        <td>
+                                            <button class="btn btn-small danger" onclick="deleteImage(${img.id}, '${img.filename}')">Delete</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading images:', error);
+            }
+        }
+
+        async function loadProxies() {
+            try {
+                const response = await fetch('/api.php?action=admin_get_proxies');
+                const result = await response.json();
+
+                if (result.success) {
+                    const container = document.getElementById('proxiesTable');
+                    document.getElementById('totalProxies').textContent = result.proxies.length;
+
+                    if (result.proxies.length === 0) {
+                        container.innerHTML = '<div class="empty-state">No proxies found</div>';
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Proxy URL</th>
+                                    <th>Owner</th>
+                                    <th>Status</th>
+                                    <th>Last Used</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${result.proxies.map(proxy => `
+                                    <tr>
+                                        <td>${proxy.id}</td>
+                                        <td><code>${proxy.proxy_url}</code></td>
+                                        <td>${proxy.username || 'Unknown'}</td>
+                                        <td>
+                                            <span class="badge ${proxy.is_active ? 'active' : 'inactive'}">
+                                                ${proxy.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </td>
+                                        <td>${proxy.last_used ? new Date(proxy.last_used).toLocaleDateString() : 'Never'}</td>
+                                        <td>${new Date(proxy.created_at).toLocaleDateString()}</td>
+                                        <td>
+                                            <button class="btn btn-small danger" onclick="deleteProxyAdmin(${proxy.id})">Delete</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading proxies:', error);
+            }
+        }
+
+        async function changePassword(userId) {
+            const newPassword = prompt('Enter new password (min 8 characters):');
+            if (!newPassword || newPassword.length < 8) {
+                alert('Password must be at least 8 characters');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api.php?action=admin_change_password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, new_password: newPassword })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Password changed successfully');
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to change password');
+            }
+        }
+
+        async function toggleActive(userId) {
+            if (!confirm('Toggle user active status?')) return;
+
+            try {
+                const response = await fetch('/api.php?action=admin_toggle_active', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadUsers();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to toggle user status');
+            }
+        }
+
+        async function toggleAdmin(userId) {
+            if (!confirm('Toggle admin status for this user?')) return;
+
+            try {
+                const response = await fetch('/api.php?action=admin_toggle_admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadUsers();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to toggle admin status');
+            }
+        }
+
+        async function deleteUser(userId, username) {
+            if (!confirm(`Are you sure you want to delete user '${username}'? This will also delete all their images and proxies.`)) return;
+
+            try {
+                const response = await fetch('/api.php?action=admin_delete_user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadUsers();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete user');
+            }
+        }
+
+        async function deleteImage(imageId, filename) {
+            if (!confirm(`Delete image '${filename}'?`)) return;
+
+            try {
+                const response = await fetch('/api.php?action=admin_delete_image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_id: imageId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadImages();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete image');
+            }
+        }
+
+        async function deleteProxyAdmin(proxyId) {
+            if (!confirm('Delete this proxy?')) return;
+
+            try {
+                const response = await fetch('/api.php?action=admin_delete_proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proxy_id: proxyId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadProxies();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete proxy');
+            }
+        }
+
+        // Load all data on page load
+        loadUsers();
+        loadImages();
+        loadProxies();
+    </script>
+</body>
+</html>

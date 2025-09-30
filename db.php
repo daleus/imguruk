@@ -10,6 +10,8 @@ function getDB() {
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         api_token TEXT,
+        is_admin INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )');
 

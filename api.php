@@ -2,6 +2,7 @@
 require_once 'auth.php';
 require_once 'upload.php';
 require_once 'proxy.php';
+require_once 'admin.php';
 
 // Set JSON header for API responses (except for download_script)
 $action = $_GET['action'] ?? '';
@@ -175,6 +176,146 @@ switch ($action) {
         $proxyId = $data['proxy_id'] ?? 0;
 
         $result = deleteProxy($proxyId, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    // Admin endpoints
+    case 'admin_get_users':
+        if (!isLoggedIn() || !isAdmin(getCurrentUserId())) {
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        $users = getAllUsers();
+        echo json_encode(['success' => true, 'users' => $users]);
+        break;
+
+    case 'admin_get_images':
+        if (!isLoggedIn() || !isAdmin(getCurrentUserId())) {
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        $images = getAllImages();
+        echo json_encode(['success' => true, 'images' => $images]);
+        break;
+
+    case 'admin_get_proxies':
+        if (!isLoggedIn() || !isAdmin(getCurrentUserId())) {
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        $proxies = getAllProxies();
+        echo json_encode(['success' => true, 'proxies' => $proxies]);
+        break;
+
+    case 'admin_delete_image':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $imageId = $data['image_id'] ?? 0;
+
+        $result = deleteImage($imageId, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_change_password':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $userId = $data['user_id'] ?? 0;
+        $newPassword = $data['new_password'] ?? '';
+
+        $result = changeUserPassword($userId, $newPassword, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_toggle_active':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $userId = $data['user_id'] ?? 0;
+
+        $result = toggleUserActive($userId, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_toggle_admin':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $userId = $data['user_id'] ?? 0;
+
+        $result = toggleUserAdmin($userId, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_delete_user':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $userId = $data['user_id'] ?? 0;
+
+        $result = deleteUser($userId, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_delete_proxy':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $proxyId = $data['proxy_id'] ?? 0;
+
+        $result = deleteProxyAdmin($proxyId, getCurrentUserId());
         echo json_encode($result);
         break;
 

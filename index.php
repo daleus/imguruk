@@ -114,9 +114,11 @@ if ($subdomain === 'i') {
 } else {
     // Show homepage for non-i subdomains
     require_once 'auth.php';
+    require_once 'admin.php';
 
     $isLoggedIn = isLoggedIn();
     $username = $_SESSION['username'] ?? '';
+    $isUserAdmin = $isLoggedIn ? isAdmin(getCurrentUserId()) : false;
     ?>
     <!DOCTYPE html>
     <html lang="en">
@@ -150,6 +152,9 @@ if ($subdomain === 'i') {
                         <span>Welcome, <?php echo htmlspecialchars($username); ?></span>
                         <a href="/upload.html">Upload</a>
                         <a href="/contribute.html">Contribute</a>
+                        <?php if ($isUserAdmin): ?>
+                            <a href="/admin.html">Admin</a>
+                        <?php endif; ?>
                         <a href="/api.php?action=logout">Logout</a>
                     <?php else: ?>
                         <a href="/login.html">Login</a>

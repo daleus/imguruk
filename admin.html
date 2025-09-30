@@ -81,6 +81,7 @@
             <button class="tab active" onclick="switchTab('users')">Users</button>
             <button class="tab" onclick="switchTab('images')">Images</button>
             <button class="tab" onclick="switchTab('proxies')">Proxies</button>
+            <button class="tab" onclick="switchTab('todos')">Todos</button>
         </div>
 
         <div id="users" class="tab-content active">
@@ -100,8 +101,51 @@
         <div id="proxies" class="tab-content">
             <div class="section">
                 <h2>Registered Proxies</h2>
-                <div id="proxiesTable">Loading...</div>
+                <button class="btn" onclick="checkAllProxiesHealth()">🩺 Check All Health</button>
+                <div id="proxiesTable" style="margin-top: 1rem;">Loading...</div>
             </div>
+        </div>
+
+        <div id="todos" class="tab-content">
+            <div class="section">
+                <h2>Admin Todos</h2>
+                <button class="btn" onclick="showAddTodoModal()">+ Add Todo</button>
+                <div id="kanban" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 2rem;">
+                    <div class="kanban-column" style="background: #0a0a0a; padding: 1rem; border-radius: 8px;">
+                        <h3 style="margin-bottom: 1rem; color: #aaa;">📋 To Do</h3>
+                        <div id="todoColumn" class="kanban-tasks" style="min-height: 300px;"></div>
+                    </div>
+                    <div class="kanban-column" style="background: #0a0a0a; padding: 1rem; border-radius: 8px;">
+                        <h3 style="margin-bottom: 1rem; color: #ff9800;">🔨 In Progress</h3>
+                        <div id="inProgressColumn" class="kanban-tasks" style="min-height: 300px;"></div>
+                    </div>
+                    <div class="kanban-column" style="background: #0a0a0a; padding: 1rem; border-radius: 8px;">
+                        <h3 style="margin-bottom: 1rem; color: #4CAF50;">✅ Done</h3>
+                        <div id="doneColumn" class="kanban-tasks" style="min-height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Todo Modal -->
+    <div id="addTodoModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: #1a1a1a; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px; border: 1px solid #333;">
+            <h2 style="margin-bottom: 1rem;">Add New Todo</h2>
+            <form id="addTodoForm">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #aaa;">Title</label>
+                    <input type="text" id="todoTitle" required style="width: 100%; padding: 0.75rem; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; color: #fff;">
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: #aaa;">Description</label>
+                    <textarea id="todoDescription" rows="4" style="width: 100%; padding: 0.75rem; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; color: #fff; resize: vertical;"></textarea>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" class="btn">Create</button>
+                    <button type="button" class="btn secondary" onclick="hideAddTodoModal()">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -247,13 +291,23 @@
                                     <th>Proxy URL</th>
                                     <th>Owner</th>
                                     <th>Status</th>
-                                    <th>Last Used</th>
-                                    <th>Created</th>
+                                    <th>Health</th>
+                                    <th>Requests</th>
+                                    <th>Response Time</th>
+                                    <th>Last Check</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${result.proxies.map(proxy => `
+                                ${result.proxies.map(proxy => {
+                                    let healthBadge = '<span class="badge" style="background: #666;">Unknown</span>';
+                                    if (proxy.health_status === 'healthy') {
+                                        healthBadge = '<span class="badge" style="background: #4CAF50;">✓ Healthy</span>';
+                                    } else if (proxy.health_status === 'unhealthy') {
+                                        healthBadge = '<span class="badge" style="background: #f44336;">✗ Unhealthy</span>';
+                                    }
+
+                                    return `
                                     <tr>
                                         <td>${proxy.id}</td>
                                         <td><code>${proxy.proxy_url}</code></td>
@@ -263,13 +317,17 @@
                                                 ${proxy.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>
-                                        <td>${proxy.last_used ? new Date(proxy.last_used).toLocaleDateString() : 'Never'}</td>
-                                        <td>${new Date(proxy.created_at).toLocaleDateString()}</td>
+                                        <td>${healthBadge}</td>
+                                        <td>${proxy.request_count || 0}</td>
+                                        <td>${proxy.response_time ? proxy.response_time + 'ms' : '-'}</td>
+                                        <td>${proxy.last_check ? new Date(proxy.last_check).toLocaleString() : 'Never'}</td>
                                         <td>
+                                            <button class="btn btn-small secondary" onclick="checkProxyHealth(${proxy.id})">Check</button>
                                             <button class="btn btn-small danger" onclick="deleteProxyAdmin(${proxy.id})">Delete</button>
                                         </td>
                                     </tr>
-                                `).join('')}
+                                    `;
+                                }).join('')}
                             </tbody>
                         </table>
                     `;
@@ -409,10 +467,234 @@
             }
         }
 
+        async function checkProxyHealth(proxyId) {
+            try {
+                const response = await fetch('/api.php?action=admin_check_proxy_health', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proxy_id: proxyId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Health: ${result.health_status}\nResponse Time: ${result.response_time}ms\nHTTP Code: ${result.http_code}`);
+                    loadProxies(); // Refresh to show updated status
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to check proxy health');
+            }
+        }
+
+        async function checkAllProxiesHealth() {
+            if (!confirm('Check health of all proxies? This may take a moment.')) return;
+
+            try {
+                const response = await fetch('/api.php?action=admin_check_all_proxies_health', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    const healthy = result.results.filter(r => r.result.health_status === 'healthy').length;
+                    const total = result.results.length;
+                    alert(`Health check complete!\n${healthy} of ${total} proxies are healthy.`);
+                    loadProxies(); // Refresh to show updated statuses
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to check proxies health');
+            }
+        }
+
+        // Todo functions
+        async function loadTodos() {
+            try {
+                const response = await fetch('/api.php?action=admin_get_todos');
+                const result = await response.json();
+
+                if (result.success) {
+                    renderKanban(result.todos);
+                }
+            } catch (error) {
+                console.error('Error loading todos:', error);
+            }
+        }
+
+        function renderKanban(todos) {
+            const todoColumn = document.getElementById('todoColumn');
+            const inProgressColumn = document.getElementById('inProgressColumn');
+            const doneColumn = document.getElementById('doneColumn');
+
+            // Clear columns
+            todoColumn.innerHTML = '';
+            inProgressColumn.innerHTML = '';
+            doneColumn.innerHTML = '';
+
+            // Distribute todos
+            todos.forEach(todo => {
+                const card = createTodoCard(todo);
+                if (todo.status === 'todo') {
+                    todoColumn.appendChild(card);
+                } else if (todo.status === 'in_progress') {
+                    inProgressColumn.appendChild(card);
+                } else if (todo.status === 'done') {
+                    doneColumn.appendChild(card);
+                }
+            });
+
+            // Add empty state if no todos
+            if (todos.length === 0) {
+                todoColumn.innerHTML = '<div style="color: #666; text-align: center; padding: 2rem;">No todos yet</div>';
+            }
+        }
+
+        function createTodoCard(todo) {
+            const card = document.createElement('div');
+            card.className = 'todo-card';
+            card.style.cssText = 'background: #1a1a1a; padding: 1rem; border-radius: 4px; margin-bottom: 0.5rem; border: 1px solid #333; cursor: move; user-select: none;';
+            card.draggable = true;
+            card.dataset.id = todo.id;
+            card.dataset.status = todo.status;
+
+            card.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 0.5rem;">${todo.title}</div>
+                ${todo.description ? `<div style="color: #aaa; font-size: 0.9rem; margin-bottom: 0.5rem;">${todo.description}</div>` : ''}
+                <div style="font-size: 0.85rem; color: #666; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        ${todo.created_by_name ? `<span>By: ${todo.created_by_name}</span>` : ''}
+                        ${todo.assigned_to_name ? ` • <span style="color: #4CAF50;">Assigned: ${todo.assigned_to_name}</span>` : ''}
+                    </div>
+                    <button onclick="deleteTodoItem(${todo.id}); event.stopPropagation();" style="background: #f44336; color: #fff; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Delete</button>
+                </div>
+            `;
+
+            // Drag events
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', todo.id);
+                card.style.opacity = '0.5';
+            });
+
+            card.addEventListener('dragend', (e) => {
+                card.style.opacity = '1';
+            });
+
+            return card;
+        }
+
+        // Setup drop zones
+        ['todoColumn', 'inProgressColumn', 'doneColumn'].forEach(columnId => {
+            const column = document.getElementById(columnId);
+
+            column.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                column.style.background = 'rgba(76, 175, 80, 0.1)';
+                column.style.border = '2px dashed #4CAF50';
+            });
+
+            column.addEventListener('dragleave', (e) => {
+                column.style.background = '';
+                column.style.border = '';
+            });
+
+            column.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                column.style.background = '';
+                column.style.border = '';
+
+                const todoId = e.dataTransfer.getData('text/plain');
+
+                // Determine new status based on column
+                let newStatus = 'todo';
+                if (columnId === 'inProgressColumn') newStatus = 'in_progress';
+                if (columnId === 'doneColumn') newStatus = 'done';
+
+                // Update status
+                try {
+                    const response = await fetch('/api.php?action=admin_update_todo_status', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ todo_id: parseInt(todoId), status: newStatus })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        loadTodos();
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Failed to update todo');
+                }
+            });
+        });
+
+        function showAddTodoModal() {
+            document.getElementById('addTodoModal').style.display = 'flex';
+        }
+
+        function hideAddTodoModal() {
+            document.getElementById('addTodoModal').style.display = 'none';
+            document.getElementById('addTodoForm').reset();
+        }
+
+        document.getElementById('addTodoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const title = document.getElementById('todoTitle').value;
+            const description = document.getElementById('todoDescription').value;
+
+            try {
+                const response = await fetch('/api.php?action=admin_create_todo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    hideAddTodoModal();
+                    loadTodos();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to create todo');
+            }
+        });
+
+        async function deleteTodoItem(todoId) {
+            if (!confirm('Delete this todo?')) return;
+
+            try {
+                const response = await fetch('/api.php?action=admin_delete_todo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ todo_id: todoId })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    loadTodos();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to delete todo');
+            }
+        }
+
         // Load all data on page load
         loadUsers();
         loadImages();
         loadProxies();
+        loadTodos();
     </script>
 </body>
 </html>

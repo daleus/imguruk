@@ -37,6 +37,20 @@ function getDB() {
         FOREIGN KEY (user_id) REFERENCES users(id)
     )');
 
+    // Create admin_todos table
+    $db->exec('CREATE TABLE IF NOT EXISTS admin_todos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT "todo",
+        created_by INTEGER NOT NULL,
+        assigned_to INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id),
+        FOREIGN KEY (assigned_to) REFERENCES users(id)
+    )');
+
     return $db;
 }
 
@@ -109,8 +123,8 @@ function getRandomProxy() {
     $proxy = $result->fetchArray(SQLITE3_ASSOC);
 
     if ($proxy) {
-        // Update last_used timestamp
-        $updateStmt = $db->prepare('UPDATE user_proxies SET last_used = CURRENT_TIMESTAMP WHERE id = :id');
+        // Update last_used timestamp and increment request count
+        $updateStmt = $db->prepare('UPDATE user_proxies SET last_used = CURRENT_TIMESTAMP, request_count = request_count + 1 WHERE id = :id');
         $updateStmt->bindValue(':id', $proxy['id'], SQLITE3_INTEGER);
         $updateStmt->execute();
     }

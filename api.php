@@ -319,6 +319,126 @@ switch ($action) {
         echo json_encode($result);
         break;
 
+    case 'admin_get_todos':
+        if (!isLoggedIn() || !isAdmin(getCurrentUserId())) {
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        $todos = getAllTodos();
+        echo json_encode(['success' => true, 'todos' => $todos]);
+        break;
+
+    case 'admin_create_todo':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $title = $data['title'] ?? '';
+        $description = $data['description'] ?? '';
+
+        $result = createTodo($title, $description, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_update_todo_status':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $todoId = $data['todo_id'] ?? 0;
+        $status = $data['status'] ?? '';
+
+        $result = updateTodoStatus($todoId, $status, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_update_todo':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $todoId = $data['todo_id'] ?? 0;
+        $title = $data['title'] ?? '';
+        $description = $data['description'] ?? '';
+        $assignedTo = $data['assigned_to'] ?? null;
+
+        $result = updateTodo($todoId, $title, $description, $assignedTo, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_delete_todo':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $todoId = $data['todo_id'] ?? 0;
+
+        $result = deleteTodo($todoId, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_check_proxy_health':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        $proxyId = $data['proxy_id'] ?? 0;
+
+        $result = checkProxyHealth($proxyId, getCurrentUserId());
+        echo json_encode($result);
+        break;
+
+    case 'admin_check_all_proxies_health':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Invalid request method']);
+            exit;
+        }
+
+        if (!isLoggedIn()) {
+            echo json_encode(['success' => false, 'error' => 'Must be logged in']);
+            exit;
+        }
+
+        $result = checkAllProxiesHealth(getCurrentUserId());
+        echo json_encode($result);
+        break;
+
     default:
         echo json_encode(['success' => false, 'error' => 'Invalid action']);
         break;

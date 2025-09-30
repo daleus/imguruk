@@ -11,6 +11,23 @@ function generateProxyScript($apiToken) {
 define('API_TOKEN', '%%TOKEN%%');
 define('ALLOWED_REFERER', 'imguruk.com');
 
+// Health check endpoint
+if (isset($_GET['health']) && $_GET['health'] === 'check') {
+    $authToken = $_SERVER['HTTP_X_API_TOKEN'] ?? '';
+    if ($authToken === API_TOKEN) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'status' => 'healthy',
+            'timestamp' => time(),
+            'version' => '1.0'
+        ]);
+        exit;
+    } else {
+        http_response_code(403);
+        exit;
+    }
+}
+
 // Validate the request
 $referer = $_SERVER['HTTP_REFERER'] ?? '';
 $authToken = $_SERVER['HTTP_X_API_TOKEN'] ?? '';

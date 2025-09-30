@@ -210,3 +210,179 @@ function deleteProxyAdmin($proxyId, $adminUserId) {
 
     return ['success' => true, 'message' => 'Proxy deleted'];
 }
+
+// Get all admin todos
+function getAllTodos() {
+    $db = getDB();
+    $result = $db->query('
+        SELECT t.*,
+               u1.username as created_by_name,
+               u2.username as assigned_to_name
+        FROM admin_todos t
+        LEFT JOIN users u1 ON t.created_by = u1.id
+        LEFT JOIN users u2 ON t.assigned_to = u2.id
+        ORDER BY t.created_at DESC
+    ');
+
+    $todos = [];
+    while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+        $todos[] = $row;
+    }
+
+    return $todos;
+}
+
+// Create todo
+function createTodo($title, $description, $createdBy) {
+    if (!isAdmin($createdBy)) {
+        return ['success' => false, 'error' => 'Unauthorized'];
+    }
+
+    if (empty($title)) {
+        return ['success' => false, 'error' => 'Title is required'];
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare('INSERT INTO admin_todos (title, description, created_by) VALUES (:title, :description, :created_by)');
+    $stmt->bindValue(':title', $title, SQLITE3_TEXT);
+    $stmt->bindValue(':description', $description, SQLITE3_TEXT);
+    $stmt->bindValue(':created_by', $createdBy, SQLITE3_INTEGER);
+
+    try {
+        $stmt->execute();
+        return ['success' => true, 'message' => 'Todo created', 'id' => $db->lastInsertRowID()];
+    } catch (Exception $e) {
+        return ['success' => false, 'error' => 'Failed to create todo'];
+    }
+}
+
+// Update todo status
+function updateTodoStatus($todoId, $status, $adminUserId) {
+    if (!isAdmin($adminUserId)) {
+        return ['success' => false, 'error' => 'Unauthorized'];
+    }
+
+    $allowedStatuses = ['todo', 'in_progress', 'done'];
+    if (!in_array($status, $allowedStatuses)) {
+        return ['success' => false, 'error' => 'Invalid status'];
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare('UPDATE admin_todos SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE id = :id');
+    $stmt->bindValue(':status', $status, SQLITE3_TEXT);
+    $stmt->bindValue(':id', $todoId, SQLITE3_INTEGER);
+    $stmt->execute();
+
+    return ['success' => true, 'message' => 'Status updated'];
+}
+
+// Update todo
+function updateTodo($todoId, $title, $description, $assignedTo, $adminUserId) {
+    if (!isAdmin($adminUserId)) {
+        return ['success' => false, 'error' => 'Unauthorized'];
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare('UPDATE admin_todos SET title = :title, description = :description, assigned_to = :assigned_to, updated_at = CURRENT_TIMESTAMP WHERE id = :id');
+    $stmt->bindValue(':title', $title, SQLITE3_TEXT);
+    $stmt->bindValue(':description', $description, SQLITE3_TEXT);
+    $stmt->bindValue(':assigned_to', $assignedTo ? $assignedTo : null, SQLITE3_INTEGER);
+    $stmt->bindValue(':id', $todoId, SQLITE3_INTEGER);
+    $stmt->execute();
+
+    return ['success' => true, 'message' => 'Todo updated'];
+}
+
+// Delete todo
+function deleteTodo($todoId, $adminUserId) {
+    if (!isAdmin($adminUserId)) {
+        return ['success' => false, 'error' => 'Unauthorized'];
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare('DELETE FROM admin_todos WHERE id = :id');
+    $stmt->bindValue(':id', $todoId, SQLITE3_INTEGER);
+    $stmt->execute();
+
+    return ['success' => true, 'message' => 'Todo deleted'];
+}
+
+// Check proxy health
+function checkProxyHealth($proxyId, $adminUserId) {
+    if (!isAdmin($adminUserId)) {
+        return ['success' => false, 'error' => 'Unauthorized'];
+    }
+
+    $db = getDB();
+
+    // Get proxy details
+    $stmt = $db->prepare('SELECT p.*, u.api_token FROM user_proxies p JOIN users u ON p.user_id = u.id WHERE p.id = :id');
+    $stmt->bindValue(':id', $proxyId, SQLITE3_INTEGER);
+    $result = $stmt->execute();
+    $proxy = $result->fetchArray(SQLITE3_ASSOC);
+
+    if (!$proxy) {
+        return ['success' => false, 'error' => 'Proxy not found'];
+    }
+
+    // Build health check URL
+    $healthUrl = rtrim($proxy['proxy_url'], '/') . '?health=check';
+
+    // Perform health check
+    $startTime = microtime(true);
+    $ch = curl_init($healthUrl);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'X-API-Token: ' . $proxy['api_token']
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $responseTime = round((microtime(true) - $startTime) * 1000); // Convert to ms
+    curl_close($ch);
+
+    // Determine health status
+    $healthStatus = 'unhealthy';
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        if ($data && isset($data['status']) && $data['status'] === 'healthy') {
+            $healthStatus = 'healthy';
+        }
+    }
+
+    // Update proxy health in database
+    $updateStmt = $db->prepare('UPDATE user_proxies SET health_status = :status, response_time = :response_time, last_check = CURRENT_TIMESTAMP WHERE id = :id');
+    $updateStmt->bindValue(':status', $healthStatus, SQLITE3_TEXT);
+    $updateStmt->bindValue(':response_time', $responseTime, SQLITE3_INTEGER);
+    $updateStmt->bindValue(':id', $proxyId, SQLITE3_INTEGER);
+    $updateStmt->execute();
+
+    return [
+        'success' => true,
+        'health_status' => $healthStatus,
+        'response_time' => $responseTime,
+        'http_code' => $httpCode
+    ];
+}
+
+// Check all proxies health
+function checkAllProxiesHealth($adminUserId) {
+    if (!isAdmin($adminUserId)) {
+        return ['success' => false, 'error' => 'Unauthorized'];
+    }
+
+    $db = getDB();
+    $result = $db->query('SELECT id FROM user_proxies');
+
+    $results = [];
+    while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+        $checkResult = checkProxyHealth($row['id'], $adminUserId);
+        $results[] = [
+            'proxy_id' => $row['id'],
+            'result' => $checkResult
+        ];
+    }
+
+    return ['success' => true, 'results' => $results];
+}

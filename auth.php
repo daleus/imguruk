@@ -25,6 +25,17 @@ function register($username, $email, $password, $honeypot = []) {
         return ['success' => false, 'error' => 'Password must be at least 8 characters'];
     }
 
+    // Normalize username to lowercase for case-insensitive comparison
+    $username = strtolower($username);
+
+    // Check for existing username (case-insensitive)
+    $checkStmt = $db->prepare('SELECT id FROM users WHERE LOWER(username) = :username');
+    $checkStmt->bindValue(':username', $username, SQLITE3_TEXT);
+    $checkResult = $checkStmt->execute();
+    if ($checkResult->fetchArray(SQLITE3_ASSOC)) {
+        return ['success' => false, 'error' => 'Username already exists'];
+    }
+
     // Hash password and generate API token
     $passwordHash = password_hash($password, PASSWORD_DEFAULT);
     $apiToken = generateApiToken();
@@ -54,7 +65,10 @@ function register($username, $email, $password, $honeypot = []) {
 function login($username, $password) {
     $db = getDB();
 
-    $stmt = $db->prepare('SELECT id, username, password_hash FROM users WHERE username = :username');
+    // Normalize username to lowercase for case-insensitive comparison
+    $username = strtolower($username);
+
+    $stmt = $db->prepare('SELECT id, username, password_hash FROM users WHERE LOWER(username) = :username');
     $stmt->bindValue(':username', $username, SQLITE3_TEXT);
     $result = $stmt->execute();
     $user = $result->fetchArray(SQLITE3_ASSOC);
